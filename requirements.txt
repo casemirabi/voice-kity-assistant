@@ -1,0 +1,6 @@
+sounddevice
+scipy
+numpy
+pyttsx3
+faster-whisper
+pdfplumber
