@@ -81,40 +81,80 @@ def format_answer(found):
 
 
 def main():
-    catalog = load_catalog_from_pdf("BOTICÁRIO - CICLO 06.pdf")
-    print(f"📦 Catálogo carregado: {len(catalog)} itens")
+    CATALOG_PATH = "BOTICÁRIO - CICLO 06.pdf"
+
+    # Carregar catálogo com tratamento de erro
+    try:
+        catalog = load_catalog_from_pdf(CATALOG_PATH)
+        print(f"📦 Catálogo carregado: {len(catalog)} itens")
+    except Exception as e:
+        print("❌ Erro ao carregar catálogo:", e)
+        speak("Não consegui carregar o catálogo.")
+        return
 
     speak("Assistente pronto. Diga o que você procura.")
 
+    fail_count = 0
+
     while True:
-        record_wav("user.wav", seconds=5, mic_id=MIC_ID)
+        # Captura e transcrição com proteção
+        try:
+            record_wav("user.wav", seconds=5, mic_id=MIC_ID)
+            text = transcribe("user.wav")
+        except Exception as e:
+            print("❌ Erro de áudio:", e)
+            speak("Tive um problema ao ouvir você. Tente novamente.")
+            continue
 
-        text = transcribe("user.wav")
-        print("📝 Você disse:", text)
+        print(f"📝 Você disse: {text}")
 
+        # Falha de entendimento
         if not text:
+            fail_count += 1
+            if fail_count >= 3:
+                speak("Encerrando por falta de resposta.")
+                break
             speak("Não entendi. Pode repetir?")
             continue
 
+        fail_count = 0
+
+        text = text.lower().strip().replace(".", "")
+        
+        # Interpretar intenção
         q = parse_query(text)
 
-        # ⚠️ sair vem primeiro
-        if q.intent == "sair":
-            speak("Encerrando. Até mais!")
-            break
-
-        if q.intent != "buscar":
-            speak("Diga o nome de um produto. Por exemplo: Malbec ou Floratta Red.")
+        if not q:
+            speak("Não entendi o que você quis dizer.")
             continue
 
+        #print(f"[INTENT] {q.intent} | keyword={q.keyword} | max_price={q.max_price}")
+
+        # Sair
+        if q.intent == "sair" or q.intent == "encerrar":
+            speak("Encerrando. Até mais!")
+            break
+        
+        # Fora do escopo
+        if q.intent != "buscar":
+            speak("Você pode pedir algo como Malbec, Floratta ou definir um preço máximo.")
+            continue
+
+        # Buscar produtos
         found = search_catalog(catalog, q.keyword, q.max_price)
 
+        if not found:
+            speak("Não encontrei produtos com esse critério.")
+            continue
+
+        # Resposta
         answer = format_answer(found)
 
-        print("🤖", answer)
+        print(f"🤖 {answer}")
         speak(answer)
 
-        time.sleep(1)
+        print(f"🤖Quer buscar outro produto ou quer encerrar?")
+        speak(f"🤖Quer buscar outro produto ou quer encerrar?")
 
 
 if __name__ == "__main__":
